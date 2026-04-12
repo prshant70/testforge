@@ -4,6 +4,7 @@ import typer
 
 from testforge.core.context import require_app_context
 from testforge.core.error_handler import handle_errors
+from testforge.core.models.requests import PerfRequest
 from testforge.core.services import PerfService
 
 perf_app = typer.Typer(
@@ -17,4 +18,4 @@ perf_app = typer.Typer(
 def perf(ctx: typer.Context) -> None:
     """Placeholder command; no analysis is run yet."""
     app_ctx = require_app_context(ctx)
-    typer.echo(PerfService().run(app_ctx=app_ctx))
+    PerfService(app_ctx).run(PerfRequest())

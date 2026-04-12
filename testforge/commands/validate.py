@@ -9,8 +9,8 @@ import typer
 
 from testforge.core.context import require_app_context
 from testforge.core.error_handler import handle_errors
+from testforge.core.models.requests import ValidateRequest
 from testforge.core.services import ValidationService
-from testforge.core.validator import validate_git_branch, validate_path_exists
 
 validate_app = typer.Typer(
     help="Validate regressions between two branches.",
@@ -42,10 +42,11 @@ def validate(
         dir_okay=True,
     ),
 ) -> None:
-    """Check for behavioral regressions between branches (stub)."""
+    """Check for regressions between branches (delegates to :class:`ValidationService`)."""
     app_ctx = require_app_context(ctx)
-    repo = validate_path_exists(path, kind="Repository path") if path else None
-    b = validate_git_branch(base, repo=repo)
-    f = validate_git_branch(feature, repo=repo)
-    msg = ValidationService().run(base=b, feature=f, repo=repo, app_ctx=app_ctx)
-    typer.echo(msg)
+    request = ValidateRequest(
+        base=base,
+        feature=feature,
+        path=str(path) if path else None,
+    )
+    ValidationService(app_ctx).run(request)

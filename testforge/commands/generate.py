@@ -9,8 +9,8 @@ import typer
 
 from testforge.core.context import require_app_context
 from testforge.core.error_handler import handle_errors
+from testforge.core.models.requests import GenerateRequest
 from testforge.core.services import TestGenerationService
-from testforge.core.validator import validate_path_exists
 
 generate_app = typer.Typer(
     help="Generate tests for a Python service.",
@@ -47,17 +47,11 @@ def generate(
         dir_okay=False,
     ),
 ) -> None:
-    """
-    Generate tests for a Python tree.
-
-    Validates that ``--path`` exists, then prints a structured status line.
-    """
+    """Generate tests for a Python tree (delegates to :class:`TestGenerationService`)."""
     app_ctx = require_app_context(ctx)
-    resolved = validate_path_exists(path, kind="Service path")
-    msg = TestGenerationService().run(
-        path=resolved,
-        output=output,
-        config_path=config,
-        app_ctx=app_ctx,
+    request = GenerateRequest(
+        path=path,
+        output=str(output) if output else None,
+        config_path=str(config) if config else None,
     )
-    typer.echo(msg)
+    TestGenerationService(app_ctx).run(request)

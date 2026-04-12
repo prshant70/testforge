@@ -1,9 +1,11 @@
 """Smoke tests for the TestForge CLI."""
 
+import logging
 import subprocess
 import sys
 from pathlib import Path
 
+import pytest
 from typer.testing import CliRunner
 
 from testforge.cli import app
@@ -73,18 +75,20 @@ def test_generate_requires_path() -> None:
     assert result.exit_code != 0
 
 
-def test_generate_runs(tmp_path: Path) -> None:
+def test_generate_runs(tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
+    caplog.set_level(logging.INFO)
     svc = tmp_path / "svc"
     svc.mkdir()
     result = runner.invoke(app, ["generate", "--path", str(svc)])
     assert result.exit_code == 0
-    assert "Generating tests" in result.stdout
+    assert "Generating tests" in caplog.text
 
 
-def test_perf_stub() -> None:
+def test_perf_stub(caplog: pytest.LogCaptureFixture) -> None:
+    caplog.set_level(logging.INFO)
     result = runner.invoke(app, ["perf"])
     assert result.exit_code == 0
-    assert "not implemented" in result.stdout.lower()
+    assert "not implemented" in caplog.text.lower()
 
 
 def test_version() -> None:
@@ -157,7 +161,11 @@ def test_diff_rejects_non_git_directory(tmp_path: Path) -> None:
     assert code == 2
 
 
-def test_diff_and_validate_git_repo(tmp_path: Path) -> None:
+def test_diff_and_validate_git_repo(
+    tmp_path: Path,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    caplog.set_level(logging.INFO)
     _git_init_with_commit(tmp_path)
     subprocess.run(
         ["git", "checkout", "-b", "feature"],
@@ -170,10 +178,10 @@ def test_diff_and_validate_git_repo(tmp_path: Path) -> None:
         ["diff", "--base", "main", "--feature", "feature", "--path", str(tmp_path)],
     )
     assert diff_result.exit_code == 0
-    assert "Analyzing diff" in diff_result.stdout
+    assert "Analyzing diff" in caplog.text
     val = runner.invoke(
         app,
         ["validate", "--base", "main", "--feature", "feature", "--path", str(tmp_path)],
     )
     assert val.exit_code == 0
-    assert "Validating regressions" in val.stdout
+    assert "Validating regressions" in caplog.text
