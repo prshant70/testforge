@@ -15,6 +15,17 @@ class ChangeSummary:
     diff_text: str
 
 
+_EXCLUDED_PATHSPECS = [
+    ":(exclude)*.lock",
+    ":(exclude)poetry.lock",
+    ":(exclude)Pipfile.lock",
+    ":(exclude)package-lock.json",
+    ":(exclude)pnpm-lock.yaml",
+    ":(exclude)yarn.lock",
+    ":(exclude)Cargo.lock",
+]
+
+
 def _run_git(repo: Path, args: list[str]) -> str:
     proc = subprocess.run(
         ["git", *args],
@@ -38,8 +49,10 @@ def analyze_changes(base: str, feature: str, *, repo_path: Optional[str] = None)
     """
     repo = Path(repo_path or ".").expanduser().resolve()
 
-    diff_text = _run_git(repo, ["diff", f"{base}...{feature}"])
-    files_raw = _run_git(repo, ["diff", "--name-only", f"{base}...{feature}"])
+    # Exclude dependency lockfiles and similar noisy artifacts from diff-based planning.
+    pathspec = ["--", ".", *_EXCLUDED_PATHSPECS]
+    diff_text = _run_git(repo, ["diff", f"{base}...{feature}", *pathspec])
+    files_raw = _run_git(repo, ["diff", "--name-only", f"{base}...{feature}", *pathspec])
     files = [line.strip() for line in files_raw.splitlines() if line.strip()]
 
     # v1 language-agnostic: do not try to parse language-specific symbols.

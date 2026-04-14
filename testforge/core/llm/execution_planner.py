@@ -28,7 +28,7 @@ def plan_execution(validation_plan: ValidationPlan, tools: CodeTools, *, config:
             steps=[
                 {"action": "inspect_diff", "tool": "get_diff"},
                 {"action": "list_files", "tool": "list_files", "args": {"limit": 200}},
-                {"action": "summarize_expected_behavior", "input": validation_plan.scenarios[:5]},
+                {"action": "use_validation_plan_text", "input": getattr(validation_plan, "raw_output", "")[:800]},
             ],
         )
 
@@ -83,8 +83,8 @@ def plan_execution(validation_plan: ValidationPlan, tools: CodeTools, *, config:
         "Keep steps <= 8."
     )
     user = (
-        "Validation scenarios:\n"
-        + "\n".join(f"- {s}" for s in validation_plan.scenarios)
+        "Validation plan:\n"
+        + getattr(validation_plan, "raw_output", "")
         + "\n\nCreate an execution plan. Use tools like get_diff, list_files, read_file as needed."
     )
 

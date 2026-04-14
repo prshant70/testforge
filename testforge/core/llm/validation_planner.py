@@ -1,9 +1,8 @@
-"""LLM-backed validation scenario planner (with deterministic fallback)."""
+"""LLM-backed validation planner (structured text output + safety fallback)."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import List
 
 from testforge.core.analyzer.change_analyzer import ChangeSummary
 from testforge.core.analyzer.impact_mapper import ImpactSummary
@@ -11,43 +10,97 @@ from testforge.core.analyzer.risk_classifier import RiskSummary
 from testforge.core.llm.guard import llm_disabled
 
 
+SYSTEM_PROMPT = """
+You are a senior backend engineer reviewing a code change.
+
+Your goal is NOT to list generic test cases.
+
+Your goal is to:
+1. Understand what changed
+2. Identify what behavior might break
+3. Prioritize the highest risk issues
+4. Suggest only the most important validations
+
+Be precise, practical, and concise.
+
+Focus on:
+- behavior changes
+- edge cases introduced by the change
+- error handling differences
+- downstream dependency impact
+
+Avoid generic suggestions.
+Avoid repeating obvious validations unless they are at risk.
+
+Always highlight at least one likely regression if possible.
+
+Think like someone reviewing a PR before merging to production.
+"""
+
+
 @dataclass
 class ValidationPlan:
-    scenarios: List[str]
-
-    def _display_lines(self) -> list[str]:
-        out: list[str] = []
-        out.append("📦 Changed:")
-        out.append("- (see below)")  # caller prints change details separately
-        out.append("")
-        out.append("🧠 Suggested validation:")
-        for i, s in enumerate(self.scenarios, 1):
-            out.append(f"{i}. {s}")
-        return out
+    raw_output: str
 
 
-def _fallback_plan(risk: RiskSummary, impact: ImpactSummary) -> ValidationPlan:
-    scenarios: list[str] = []
-    # Prefer endpoint-targeted checks when available.
-    if impact.endpoints:
-        ep = impact.endpoints[0]
-        scenarios.append(f"{ep}: verify happy-path response shape and status code")
-        scenarios.append(f"{ep}: verify invalid payload returns client error (not 500)")
-        scenarios.append(f"{ep}: verify missing required fields returns clear validation error")
-    if "validation change" in risk.types:
-        scenarios.append("input validation: boundary values + empty/null + unexpected types (watch for silent coercion)")
-    if "error handling change" in risk.types:
-        scenarios.append("error handling: force an exception path and verify error is handled + logged (no crash/no leaked secrets)")
-    if "data persistence change" in risk.types:
-        scenarios.append("data persistence: verify schema/migration compatibility + write/read + rollback on failure")
-    if "external call change" in risk.types:
-        scenarios.append("external calls: simulate timeout/5xx and verify retry/fallback/circuit behavior")
-    if not scenarios:
-        scenarios = [
-            "targeted smoke test of the changed user flow (based on diff intent)",
-            "run unit tests covering the changed files/modules",
-        ]
-    return ValidationPlan(scenarios=scenarios[:8])
+def build_validation_prompt(change_summary, impact_summary, risk_summary) -> str:
+    return f"""
+Code Changes Summary:
+{change_summary}
+
+Impacted Endpoints:
+{impact_summary.endpoints}
+
+Risk Types:
+{risk_summary.types}
+
+Your task:
+
+1. Explain WHAT changed in behavior (not code diff, but behavior impact)
+2. Identify WHAT might break (regression hypotheses)
+3. Classify risks into:
+   - HIGH (very likely to break)
+   - MEDIUM (possible issue)
+   - LOW (edge cases)
+4. Suggest a SMALL set of targeted validations (max 5)
+
+Output format:
+
+---
+🔍 Behavioral Impact:
+<short explanation>
+
+💥 Potential Regressions:
+
+🔥 HIGH RISK:
+- ...
+
+⚠️ MEDIUM RISK:
+- ...
+
+💡 LOW RISK:
+- ...
+
+🧪 Suggested Validations:
+1. <scenario + expected behavior>
+2. ...
+
+Rules:
+- Be specific to the endpoint
+- Include expected outcomes (status code, behavior)
+- Do NOT generate more than 5 validations
+- Prioritize signal over completeness
+"""
+
+
+def _fallback_plan() -> ValidationPlan:
+    return ValidationPlan(
+        raw_output=(
+            "⚠️ Unable to generate detailed validation plan.\n\n"
+            "Basic suggestion:\n"
+            "- Verify impacted endpoints manually"
+        ),
+    )
 
 
 def generate_validation_plan(
@@ -58,71 +111,27 @@ def generate_validation_plan(
     config: dict,
 ) -> ValidationPlan:
     """
-    Produce a small list of validation scenarios.
-
-    v1 behavior:
-    - If API key missing: deterministic fallback.
-    - If present: ask LLM for a short scenario list.
+    Produce a structured, prioritized, regression-focused plan as text.
     """
     if llm_disabled() or not str(config.get("llm_api_key") or "").strip():
-        return _fallback_plan(risk_summary, impact_summary)
+        return _fallback_plan()
 
     from testforge.core.llm._openai_tools import run_with_tools
 
-    system = (
-        "You are a change-aware validation assistant. "
-        "Your job is to surface *implicit* regression risks suggested by the diff, not generic testing advice. "
-        "Return ONLY valid JSON: {\"scenarios\": [\"...\"]}. "
-        "Rules:\n"
-        "- Each scenario MUST be specific to the change (name file/module/endpoint when possible).\n"
-        "- Each scenario MUST include an implied risk + a concrete check + an expected failure signal.\n"
-        "- Avoid generic items like 'test all endpoints', 'regression test everything', 'ensure works'.\n"
-        "- Prefer 6-10 high-signal scenarios over broad coverage.\n"
-        "- Keep each scenario to one line."
-    )
-    user = (
-        "Change summary:\n"
-        f"- files: {change_summary.files}\n\n"
-        "Impacted endpoints:\n"
-        f"{impact_summary.endpoints}\n\n"
-        "Risk:\n"
-        f"- level: {risk_summary.level}\n"
-        f"- types: {risk_summary.types}\n\n"
-        "Diff (truncated):\n"
-        f"{change_summary.diff_text[:6000]}\n\n"
-        "Propose 6-10 validation scenarios that target implicit risks in this diff."
-    )
+    user = build_validation_prompt(change_summary, impact_summary, risk_summary)
 
     text = run_with_tools(
         config=config,
-        system=system,
+        system=SYSTEM_PROMPT,
         user=user,
         tools=[],
-        purpose="generate validation scenarios",
+        purpose="generate validation plan (behavior + regressions + validations)",
         max_tool_rounds=1,
         temperature=0.2,
     )
-    # Minimal JSON parse with fallback.
-    import json
 
-    try:
-        data = json.loads(text)
-        scenarios = data.get("scenarios") or []
-        if isinstance(scenarios, list) and all(isinstance(x, str) for x in scenarios):
-            cleaned: list[str] = []
-            for s in scenarios:
-                if not isinstance(s, str):
-                    continue
-                t = s.strip()
-                if not t:
-                    continue
-                # Drop ultra-generic suggestions if the model sneaks them in.
-                low = t.lower()
-                if "test all endpoints" in low or "regression testing on all endpoints" in low:
-                    continue
-                cleaned.append(t)
-            return ValidationPlan(scenarios=cleaned[:10])
-    except Exception:
-        pass
-    return _fallback_plan(risk_summary, impact_summary)
+    out = (text or "").strip()
+    if not out:
+        return _fallback_plan()
+    return ValidationPlan(raw_output=out)
 

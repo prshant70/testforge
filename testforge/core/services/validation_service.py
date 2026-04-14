@@ -144,7 +144,7 @@ class ValidationService:
             key="validation_plan",
         )
         if cached_plan:
-            plan = ValidationPlan(scenarios=cached_plan.get("scenarios", []))
+            plan = ValidationPlan(raw_output=str(cached_plan.get("raw_output", "")).strip())
         else:
             plan = generate_validation_plan(change_summary, impact, risk, config=dict(self.config))
             if not request.nocache:
@@ -153,13 +153,8 @@ class ValidationService:
                     base_sha=base_sha,
                     feature_sha=feature_sha,
                     key="validation_plan",
-                    value={"scenarios": plan.scenarios},
+                    value={"raw_output": plan.raw_output},
                 )
-
-        # Attach summaries for CLI rendering (v1 convenience).
-        plan._change_summary = change_summary  # type: ignore[attr-defined]
-        plan._impact_summary = impact  # type: ignore[attr-defined]
-        plan._risk_summary = risk  # type: ignore[attr-defined]
 
         if not request.run:
             return plan
@@ -177,7 +172,7 @@ class ValidationService:
             )
 
         exec_plan = plan_execution(plan, tools, config=dict(self.config))
-        result = execute_validation(exec_plan, tools)
+        result = execute_validation(exec_plan, tools, run_tests=request.run_tests)
         report = analyze_results(result, plan, config=dict(self.config))
         if not request.nocache:
             write_cache(

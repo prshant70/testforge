@@ -295,3 +295,43 @@ def test_validate_nocache_bypasses_cache(tmp_path: Path, caplog: pytest.LogCaptu
     )
     assert r2.exit_code == 0
     assert "Cache miss: change_summary" in caplog.text
+
+
+def test_validate_run_tests_executes_pytest(tmp_path: Path) -> None:
+    _git_init_with_commit(tmp_path)
+    subprocess.run(
+        ["git", "checkout", "-b", "feature"],
+        cwd=tmp_path,
+        check=True,
+        capture_output=True,
+    )
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "tests" / "test_sample.py").write_text(
+        "def test_fail():\n    assert False\n",
+        encoding="utf-8",
+    )
+    subprocess.run(["git", "add", "."], cwd=tmp_path, check=True, capture_output=True)
+    subprocess.run(
+        ["git", "commit", "-m", "add failing test"],
+        cwd=tmp_path,
+        check=True,
+        capture_output=True,
+    )
+    res = runner.invoke(
+        app,
+        [
+            "validate",
+            "--base",
+            "main",
+            "--feature",
+            "feature",
+            "--path",
+            str(tmp_path),
+            "--run",
+            "--run-tests",
+        ],
+    )
+    assert res.exit_code == 0
+    # Should list selected tests but not execute pytest.
+    assert "selected pytest targets" in res.stdout.lower()
+    assert "not executed" in res.stdout.lower()

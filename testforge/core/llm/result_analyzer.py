@@ -79,14 +79,23 @@ def analyze_results(
     if llm_disabled() or not str(config.get("llm_api_key") or "").strip():
         # Deterministic report based on built-in checks.
         fails, warns = _deterministic_regressions_from_checks(execution_result)
+        pytest_targets: list[str] = []
+        for a in execution_result.artifacts:
+            if a.get("type") == "pytest" and isinstance(a.get("targets"), list):
+                pytest_targets = [str(x) for x in a.get("targets") if str(x).strip()]
+                break
 
         if fails:
             summary = "Deterministic validations found issues. Fix these before merging."
+            if pytest_targets:
+                summary += "\n\nSelected pytest targets (not executed):\n- " + "\n- ".join(pytest_targets[:25])
             return ValidationReport(regressions=fails[:10], summary=summary)
 
         summary = "Simulated validation completed. No deterministic issues detected."
         if warns:
             summary += " Warnings were found; consider follow-ups:\n- " + "\n- ".join(warns[:5])
+        if pytest_targets:
+            summary += "\n\nSelected pytest targets (not executed):\n- " + "\n- ".join(pytest_targets[:25])
         summary += "\nEnable an API key for LLM-based deeper analysis."
         return ValidationReport(regressions=[], summary=summary)
 
@@ -99,8 +108,8 @@ def analyze_results(
         "Be conservative: if uncertain, suggest follow-up validations instead of claiming regressions."
     )
     user = (
-        "Validation scenarios:\n"
-        + "\n".join(f"- {s}" for s in validation_plan.scenarios)
+        "Validation plan:\n"
+        + getattr(validation_plan, "raw_output", "")
         + "\n\nExecution observations:\n"
         + "\n".join(f"- {o}" for o in execution_result.observations)
         + "\n\nArtifacts (truncated):\n"

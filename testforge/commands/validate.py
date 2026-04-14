@@ -38,6 +38,11 @@ def validate(
         "--run",
         help="Actively execute lightweight validations (v1 simulated mode).",
     ),
+    run_tests: bool = typer.Option(
+        False,
+        "--run-tests",
+        help="List a bounded subset of impacted pytest tests (requires --run). Does not execute them.",
+    ),
     nocache: bool = typer.Option(
         False,
         "--nocache",
@@ -53,52 +58,24 @@ def validate(
     ),
 ) -> None:
     """Check for regressions between branches (delegates to :class:`ValidationService`)."""
+    if run_tests and not run:
+        raise typer.BadParameter("--run-tests requires --run.")
     app_ctx = require_app_context(ctx)
     request = ValidateRequest(
         base=base,
         feature=feature,
         path=str(path) if path else None,
         run=run,
+        run_tests=run_tests,
         nocache=nocache,
     )
     result = ValidationService(app_ctx).run(request)
 
     typer.echo("🔍 Analyzing changes...\n")
 
-    if hasattr(result, "scenarios"):
-        plan = result  # ValidationPlan
-
-        cs = getattr(plan, "_change_summary", None)
-        impact = getattr(plan, "_impact_summary", None)
-        risk = getattr(plan, "_risk_summary", None)
-
-        typer.echo("📦 Changed:")
-        if cs and getattr(cs, "functions", None):
-            for fn in cs.functions:
-                typer.echo(f"- {fn}()")
-        elif cs and getattr(cs, "files", None):
-            for fp in cs.files[:10]:
-                typer.echo(f"- {fp}")
-        else:
-            typer.echo("- (no changes detected)")
-
-        typer.echo("\n🌐 Impact:")
-        if impact and getattr(impact, "endpoints", None):
-            for ep in impact.endpoints:
-                typer.echo(f"- {ep}")
-        else:
-            typer.echo("- (no endpoints mapped)")
-
-        typer.echo("\n⚠️ Risk:")
-        if risk and getattr(risk, "types", None):
-            for t in risk.types:
-                typer.echo(f"- {t}")
-        else:
-            typer.echo("- unknown")
-
-        typer.echo("\n🧠 Suggested validation:")
-        for i, s in enumerate(plan.scenarios, 1):
-            typer.echo(f"{i}. {s}")
+    if hasattr(result, "raw_output"):
+        plan = result
+        typer.echo(plan.raw_output)
         return
 
     report = result

@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 import re
+import subprocess
+import sys
 from dataclasses import dataclass
 from typing import Any, Dict, List
 
@@ -139,7 +141,105 @@ def _deterministic_validations(tools: CodeTools) -> list[dict[str, Any]]:
     return checks
 
 
-def execute_validation(execution_plan: ExecutionPlan, tools: CodeTools) -> ExecutionResult:
+def _select_pytest_targets(tools: CodeTools, *, max_tests: int = 25) -> list[str]:
+    """
+    Best-effort selection of relevant pytest test files based on changed paths.
+    Language/framework agnostic heuristic: token overlap between changed file path
+    components and test file paths.
+    """
+    repo = tools.repo_path
+    skip = {".git", "__pycache__", ".venv", "venv", ".tox", "node_modules", ".mypy_cache", ".pytest_cache"}
+
+    test_files: list[str] = []
+    for p in repo.rglob("test_*.py"):
+        if any(part in skip or part.startswith(".") for part in p.parts):
+            continue
+        if not p.is_file():
+            continue
+        test_files.append(str(p.relative_to(repo)))
+        if len(test_files) >= 2000:
+            break
+    test_files.sort()
+    if not test_files:
+        return []
+
+    # Tokens from changed files (basename + parent dirs).
+    tokens: set[str] = set()
+    for fp in tools.changed_files:
+        parts = [p for p in fp.replace("\\", "/").split("/") if p]
+        for p in parts[-3:]:
+            stem = p.rsplit(".", 1)[0]
+            if len(stem) >= 3:
+                tokens.add(stem.lower())
+
+    scored: list[tuple[int, str]] = []
+    for rel in test_files:
+        low = rel.lower()
+        score = 0
+        for t in tokens:
+            if t in low:
+                score += 3
+        # Mild bias to top-level tests.
+        score -= low.count("/")
+        scored.append((score, rel))
+
+    scored.sort(key=lambda x: x[0], reverse=True)
+    picked = [p for s, p in scored if s > 0][:max_tests]
+    if picked:
+        return picked
+    # Fallback: just pick the first few tests if nothing matches.
+    return test_files[: min(max_tests, 10)]
+
+
+def _run_pytest(
+    tools: CodeTools,
+    targets: list[str],
+    *,
+    timeout_s: int = 90,
+) -> dict[str, Any]:
+    """
+    Execute pytest in a bounded way and return a compact result dict.
+    """
+    if not targets:
+        return {"exit_code": None, "ran": False, "reason": "no tests selected"}
+
+    cmd = [sys.executable, "-m", "pytest", "-q", *targets]
+    try:
+        proc = subprocess.run(
+            cmd,
+            cwd=tools.repo_path,
+            capture_output=True,
+            text=True,
+            timeout=timeout_s,
+        )
+        out = (proc.stdout or "") + ("\n" + proc.stderr if proc.stderr else "")
+        # Keep output bounded in artifacts.
+        tail = "\n".join(out.splitlines()[-120:])
+        return {
+            "ran": True,
+            "exit_code": proc.returncode,
+            "cmd": " ".join(cmd[:4]) + (" …" if len(cmd) > 4 else ""),
+            "targets": targets,
+            "output_tail": tail,
+        }
+    except subprocess.TimeoutExpired:
+        return {
+            "ran": True,
+            "exit_code": 124,
+            "cmd": " ".join(cmd[:4]) + (" …" if len(cmd) > 4 else ""),
+            "targets": targets,
+            "output_tail": "(timed out)",
+        }
+    except Exception as exc:
+        return {"ran": True, "exit_code": 1, "targets": targets, "output_tail": f"(pytest failed to start: {exc})"}
+
+
+def execute_validation(
+    execution_plan: ExecutionPlan,
+    tools: CodeTools,
+    *,
+    run_tests: bool = False,
+) -> ExecutionResult:
     """
     v1: simulate validations by running tool steps and recording outputs.
     This does NOT run the service or pytest; it produces signals for the LLM.
@@ -178,6 +278,22 @@ def execute_validation(execution_plan: ExecutionPlan, tools: CodeTools) -> Execu
     failed = [c for c in det if c.get("status") == "fail"]
     warned = [c for c in det if c.get("status") == "warn"]
     obs.append(f"deterministic checks: {len(det)} run, {len(failed)} failed, {len(warned)} warnings")
+
+    if run_tests:
+        targets = _select_pytest_targets(tools)
+        artifacts.append(
+            {
+                "type": "pytest",
+                "status": "info",
+                "title": "pytest selection (list only)",
+                "details": f"selected {len(targets)} test file(s) (not executed)",
+                "targets": targets,
+            },
+        )
+        if targets:
+            artifacts.append(_check("pass", "pytest targets selected", f"{len(targets)} file(s) selected"))
+        else:
+            artifacts.append(_check("warn", "pytest targets empty", "no test_*.py files found or selected"))
 
     return ExecutionResult(observations=obs, artifacts=artifacts)
 
