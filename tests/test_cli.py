@@ -199,39 +199,18 @@ def test_validate_git_repo(
 
 
 def test_validate_run_flags_invalid_json(tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
+    # Active validation mode removed; keep a basic validate smoke test.
     caplog.set_level(logging.INFO)
     _git_init_with_commit(tmp_path)
-    subprocess.run(
-        ["git", "checkout", "-b", "feature"],
-        cwd=tmp_path,
-        check=True,
-        capture_output=True,
-    )
+    subprocess.run(["git", "checkout", "-b", "feature"], cwd=tmp_path, check=True, capture_output=True)
     (tmp_path / "config_template.json").write_text("{bad json", encoding="utf-8")
     subprocess.run(["git", "add", "."], cwd=tmp_path, check=True, capture_output=True)
-    subprocess.run(
-        ["git", "commit", "-m", "bad json"],
-        cwd=tmp_path,
-        check=True,
-        capture_output=True,
-    )
+    subprocess.run(["git", "commit", "-m", "bad json"], cwd=tmp_path, check=True, capture_output=True)
     result = runner.invoke(
         app,
-        [
-            "validate",
-            "--base",
-            "main",
-            "--feature",
-            "feature",
-            "--path",
-            str(tmp_path),
-            "--run",
-        ],
+        ["validate", "--base", "main", "--feature", "feature", "--path", str(tmp_path)],
     )
     assert result.exit_code == 0
-    # Deterministic validator should surface this even without an API key.
-    assert "Regression detected" in result.stdout
-    assert "invalid json" in result.stdout.lower()
 
 
 def test_validate_uses_cache_on_repeat(tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
@@ -297,41 +276,3 @@ def test_validate_nocache_bypasses_cache(tmp_path: Path, caplog: pytest.LogCaptu
     assert "Cache miss: change_summary" in caplog.text
 
 
-def test_validate_run_tests_executes_pytest(tmp_path: Path) -> None:
-    _git_init_with_commit(tmp_path)
-    subprocess.run(
-        ["git", "checkout", "-b", "feature"],
-        cwd=tmp_path,
-        check=True,
-        capture_output=True,
-    )
-    (tmp_path / "tests").mkdir()
-    (tmp_path / "tests" / "test_sample.py").write_text(
-        "def test_fail():\n    assert False\n",
-        encoding="utf-8",
-    )
-    subprocess.run(["git", "add", "."], cwd=tmp_path, check=True, capture_output=True)
-    subprocess.run(
-        ["git", "commit", "-m", "add failing test"],
-        cwd=tmp_path,
-        check=True,
-        capture_output=True,
-    )
-    res = runner.invoke(
-        app,
-        [
-            "validate",
-            "--base",
-            "main",
-            "--feature",
-            "feature",
-            "--path",
-            str(tmp_path),
-            "--run",
-            "--run-tests",
-        ],
-    )
-    assert res.exit_code == 0
-    # Should list selected tests but not execute pytest.
-    assert "selected pytest targets" in res.stdout.lower()
-    assert "not executed" in res.stdout.lower()

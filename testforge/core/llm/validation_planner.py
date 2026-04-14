@@ -11,30 +11,38 @@ from testforge.core.llm.guard import llm_disabled
 
 
 SYSTEM_PROMPT = """
-You are a senior backend engineer reviewing a code change.
+You are a senior backend engineer reviewing a production code change before merge.
 
-Your goal is NOT to list generic test cases.
+Your goal is to produce a decisive validation report.
 
-Your goal is to:
-1. Understand what changed
-2. Identify what behavior might break
-3. Prioritize the highest risk issues
-4. Suggest only the most important validations
+You MUST:
+1. Explain behavioral impact clearly
+2. Identify specific regression scenarios
+3. Describe observable failure modes (what will break and how it will appear)
+4. Prioritize risks (HIGH / MEDIUM / LOW)
+5. Recommend the most critical validations (4–5 only)
+6. Provide a clear merge risk decision
 
-Be precise, practical, and concise.
+STRICT RULES:
 
-Focus on:
-- behavior changes
-- edge cases introduced by the change
-- error handling differences
-- downstream dependency impact
+- Do NOT use vague phrases like:
+  "may cause issues", "might fail", "could lead to problems"
 
-Avoid generic suggestions.
-Avoid repeating obvious validations unless they are at risk.
+- ALWAYS describe failure in observable terms:
+  Examples:
+  - "returns 500 instead of 400"
+  - "incorrect order status returned"
+  - "request routed to wrong handler"
 
-Always highlight at least one likely regression if possible.
+- ALWAYS include at least one HIGH risk regression with a concrete failure mode
 
-Think like someone reviewing a PR before merging to production.
+- Keep output concise but high signal
+
+- Do NOT include instructions, rules, or explanations in the output
+
+- Do NOT repeat template text like "Rules:"
+
+Think like a senior engineer deciding whether to approve or block a PR.
 """
 
 
@@ -56,41 +64,78 @@ Risk Types:
 
 Your task:
 
-1. Explain WHAT changed in behavior (not code diff, but behavior impact)
-2. Identify WHAT might break (regression hypotheses)
-3. Classify risks into:
-   - HIGH (very likely to break)
-   - MEDIUM (possible issue)
-   - LOW (edge cases)
-4. Suggest a SMALL set of targeted validations (max 5)
+1. Describe behavioral impact (what changed in system behavior)
+2. Identify concrete regression risks with failure modes
+3. Classify risks into HIGH / MEDIUM / LOW
+4. Suggest 4–5 targeted validations
 
 Output format:
 
 ---
 🔍 Behavioral Impact:
-<short explanation>
+<clear behavior explanation>
 
 💥 Potential Regressions:
 
 🔥 HIGH RISK:
-- ...
+- <specific regression + observable failure>
 
 ⚠️ MEDIUM RISK:
-- ...
+- <specific issue>
 
 💡 LOW RISK:
-- ...
+- <edge case>
 
 🧪 Suggested Validations:
-1. <scenario + expected behavior>
-2. ...
 
-Rules:
-- Be specific to the endpoint
-- Include expected outcomes (status code, behavior)
-- Do NOT generate more than 5 validations
-- Prioritize signal over completeness
+🔥 1. <critical scenario>
+   → Expect: <explicit outcome>
+
+🔥 2. ...
+   → Expect: ...
+
+⚠️ 3. ...
+   → Expect: ...
+
+⚠️ 4. ...
+   → Expect: ...
+
+💡 5. ...
+   → Expect: ...
+
+🚨 Merge Risk:
+<LOW / MEDIUM / HIGH>
+
+RULES:
+- ALWAYS include at least one concrete failure mode
+- ALWAYS produce 4 or 5 validations (not fewer)
+- Each validation MUST include expected outcome
+- Do NOT include "Rules:" in output
+- Do NOT repeat instructions
 """
+
+def sanitize_output(text: str) -> str:
+    # Remove accidental prompt leakage
+    text = (text or "")
+    text = text.replace("RULES:", "")
+    text = text.replace("Rules:", "")
+    text = text.replace("Your task:", "")
+
+    # Remove extra blank sections
+    return text.strip()
+
+
+def _looks_like_decision_report(text: str) -> bool:
+    t = (text or "").lower()
+    if "behavioral impact" not in t:
+        return False
+    if "high risk" not in t:
+        return False
+    if "merge risk" not in t:
+        return False
+    if "→ expect:" not in t:
+        return False
+    return True
 
 
 def _fallback_plan() -> ValidationPlan:
@@ -118,7 +163,11 @@ def generate_validation_plan(
 
     from testforge.core.llm._openai_tools import run_with_tools
 
-    user = build_validation_prompt(change_summary, impact_summary, risk_summary)
+    failure_hint = """
+Important:
+Describe at least one regression as a concrete failure observable by API users.
+"""
+    user = build_validation_prompt(change_summary, impact_summary, risk_summary) + "\n" + failure_hint
 
     text = run_with_tools(
         config=config,
@@ -130,8 +179,8 @@ def generate_validation_plan(
         temperature=0.2,
     )
 
-    out = (text or "").strip()
-    if not out:
+    out = sanitize_output(text)
+    if not out or not _looks_like_decision_report(out):
         return _fallback_plan()
     return ValidationPlan(raw_output=out)
 

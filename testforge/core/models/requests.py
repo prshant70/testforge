@@ -11,6 +11,4 @@ class ValidateRequest:
     base: str
     feature: str
     path: Optional[str] = None
-    run: bool = False
-    run_tests: bool = False
     nocache: bool = False

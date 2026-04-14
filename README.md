@@ -1,6 +1,6 @@
 # TestForge
 
-Change-aware validation assistant for Git diffs: identifies impacted areas, classifies risk, and suggests validation steps (optionally runs lightweight validations with `--run`).
+Change-aware validation assistant for Git diffs: identifies impacted areas, classifies risk, and suggests what should be validated before merging.
 
 ## Requirements
 
@@ -22,7 +22,6 @@ testforge config show             # prints config (API key masked)
 testforge config check            # verify config file and field values
 
 testforge validate --base main --feature my-branch [--path /path/to/repo]
-testforge validate --base main --feature my-branch --run [--path /path/to/repo]
 ```
 
 ### Configuration

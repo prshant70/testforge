@@ -12,9 +12,6 @@ from testforge.core.validator import resolve_git_sha, validate_git_branch, valid
 from testforge.core.analyzer.change_analyzer import ChangeSummary, analyze_changes
 from testforge.core.analyzer.impact_mapper import map_impact
 from testforge.core.analyzer.risk_classifier import RiskSummary, classify_risk
-from testforge.core.executor.validator import execute_validation
-from testforge.core.llm.execution_planner import plan_execution
-from testforge.core.llm.result_analyzer import ValidationReport, analyze_results
 from testforge.core.llm.validation_planner import ValidationPlan, generate_validation_plan
 from testforge.core.tools.code_tools import CodeTools
 from testforge.core.cache.store import get_repo_id, read_cache, write_cache
@@ -27,7 +24,7 @@ class ValidationService:
         self.config = ctx.config
         self.logger = ctx.logger
 
-    def run(self, request: ValidateRequest) -> ValidationPlan | ValidationReport:
+    def run(self, request: ValidateRequest) -> ValidationPlan:
         self._validate(request)
         return self._execute(request)
 
@@ -41,7 +38,7 @@ class ValidationService:
         self._resolved_feature = feature
         self._repo = repo or Path(".").resolve()
 
-    def _execute(self, request: ValidateRequest) -> ValidationPlan | ValidationReport:
+    def _execute(self, request: ValidateRequest) -> ValidationPlan:
         self.logger.info(
             "Analyzing changes between %s and %s",
             self._resolved_base,
@@ -156,30 +153,4 @@ class ValidationService:
                     value={"raw_output": plan.raw_output},
                 )
 
-        if not request.run:
-            return plan
-
-        cached_report = None if request.nocache else read_cache(
-            repo_id=repo_id,
-            base_sha=base_sha,
-            feature_sha=feature_sha,
-            key="validation_report",
-        )
-        if cached_report:
-            return ValidationReport(
-                regressions=cached_report.get("regressions", []),
-                summary=cached_report.get("summary", ""),
-            )
-
-        exec_plan = plan_execution(plan, tools, config=dict(self.config))
-        result = execute_validation(exec_plan, tools, run_tests=request.run_tests)
-        report = analyze_results(result, plan, config=dict(self.config))
-        if not request.nocache:
-            write_cache(
-                repo_id=repo_id,
-                base_sha=base_sha,
-                feature_sha=feature_sha,
-                key="validation_report",
-                value={"regressions": report.regressions, "summary": report.summary},
-            )
-        return report
+        return plan

@@ -33,16 +33,6 @@ def validate(
         "--feature",
         help="Feature branch or ref to validate against the base.",
     ),
-    run: bool = typer.Option(
-        False,
-        "--run",
-        help="Actively execute lightweight validations (v1 simulated mode).",
-    ),
-    run_tests: bool = typer.Option(
-        False,
-        "--run-tests",
-        help="List a bounded subset of impacted pytest tests (requires --run). Does not execute them.",
-    ),
     nocache: bool = typer.Option(
         False,
         "--nocache",
@@ -58,15 +48,11 @@ def validate(
     ),
 ) -> None:
     """Check for regressions between branches (delegates to :class:`ValidationService`)."""
-    if run_tests and not run:
-        raise typer.BadParameter("--run-tests requires --run.")
     app_ctx = require_app_context(ctx)
     request = ValidateRequest(
         base=base,
         feature=feature,
         path=str(path) if path else None,
-        run=run,
-        run_tests=run_tests,
         nocache=nocache,
     )
     result = ValidationService(app_ctx).run(request)
