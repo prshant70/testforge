@@ -1,0 +1,29 @@
+testforge/core/services/validation_service.py
+  88b9341a6f3549c6 27,41,156
+README.md
+  88b9341a6f3549c6 3
+tests/test_cli.py
+  88b9341a6f3549c6 202,205,208,211
+testforge/core/llm/validation_planner.py
+  88b9341a6f3549c6 14,16,18-24,26,28-29,31-35,37,39-45,67-70,76,81,84,87,91-114,117-138,166-170,182-183
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.8",
+  "base_commit_sha": "7ea7ec3a21f01fe92c8331c942672ad42448be92",
+  "prompts": {
+    "88b9341a6f3549c6": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "5c7fcd00-3809-4f9b-b7c5-2f1d3e47e7a7",
+        "model": "default"
+      },
+      "human_author": "Prashant Mishra",
+      "messages": [],
+      "total_additions": 143,
+      "total_deletions": 772,
+      "accepted_lines": 102,
+      "overriden_lines": 0
+    }
+  }
+}
