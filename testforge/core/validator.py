@@ -58,6 +58,23 @@ def validate_git_branch(branch: str, *, repo: Optional[Path] = None) -> str:
     return name
 
 
+def resolve_git_sha(ref: str, *, repo: Optional[Path] = None) -> str:
+    """Resolve a ref to a commit SHA in ``repo`` (cwd if omitted)."""
+    cwd = Path(repo).resolve() if repo else None
+    try:
+        proc = subprocess.run(
+            ["git", "rev-parse", "--verify", ref],
+            capture_output=True,
+            text=True,
+            cwd=cwd,
+        )
+    except FileNotFoundError as exc:
+        raise BranchValidationError("git executable not found; install Git.") from exc
+    if proc.returncode != 0:
+        raise BranchValidationError(f"Not a valid git ref in this repository: {ref!r}")
+    return proc.stdout.strip()
+
+
 def validate_config_present(path: Optional[Path] = None) -> Path:
     """Ensure the default (or explicit) config file exists."""
     p = path.expanduser().resolve() if path else get_config_file()

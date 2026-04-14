@@ -8,6 +8,7 @@ from typing import Dict, List
 
 from testforge.core.llm.validation_planner import ValidationPlan
 from testforge.core.tools.code_tools import CodeTools
+from testforge.core.llm.guard import llm_disabled
 
 
 @dataclass
@@ -22,7 +23,7 @@ def plan_execution(validation_plan: ValidationPlan, tools: CodeTools, *, config:
     If API key missing, return a deterministic plan that uses only `get_diff`
     and simple `read_file` for changed files (executed by the executor).
     """
-    if not str(config.get("llm_api_key") or "").strip():
+    if llm_disabled() or not str(config.get("llm_api_key") or "").strip():
         return ExecutionPlan(
             steps=[
                 {"action": "inspect_diff", "tool": "get_diff"},
@@ -92,6 +93,7 @@ def plan_execution(validation_plan: ValidationPlan, tools: CodeTools, *, config:
         system=system,
         user=user,
         tools=tool_specs,
+        purpose="plan validation execution steps",
         max_tool_rounds=4,
         temperature=0.2,
     )

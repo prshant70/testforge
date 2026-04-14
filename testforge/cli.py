@@ -10,6 +10,7 @@ import typer
 import yaml
 
 from testforge import __version__ as PKG_VERSION
+from testforge.commands.cache import cache_app
 from testforge.commands.validate import validate_app
 from testforge.core.config import (
     DEFAULTS,
@@ -34,6 +35,7 @@ app = typer.Typer(
     add_completion=False,
 )
 app.add_typer(validate_app, name="validate")
+app.add_typer(cache_app, name="cache")
 
 config_app = typer.Typer(
     help="Inspect or manage configuration.",

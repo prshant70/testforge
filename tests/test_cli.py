@@ -70,11 +70,33 @@ def test_root_help() -> None:
     assert "TestForge" in result.stdout
     assert "validate" in result.stdout
     assert "config" in result.stdout
+    assert "cache" in result.stdout
 
 
 def test_validate_requires_args() -> None:
     result = runner.invoke(app, ["validate"])
     assert result.exit_code != 0
+
+
+def test_cache_list_and_purge(tmp_path: Path) -> None:
+    # Create a fake cache file under isolated HOME (set by tests/conftest.py).
+    from testforge.core.cache.store import get_cache_root
+
+    root = get_cache_root()
+    d = root / "repo123" / "aaaa..bbbb" / "v1"
+    d.mkdir(parents=True, exist_ok=True)
+    (d / "change_summary.json").write_text(
+        '{"created_at": 1, "ttl_s": 1, "key": "change_summary", "value": {"x": 1}}\n',
+        encoding="utf-8",
+    )
+
+    res = runner.invoke(app, ["cache", "list"])
+    assert res.exit_code == 0
+    assert "repo123" in res.stdout
+
+    res2 = runner.invoke(app, ["cache", "purge", "--all"])
+    assert res2.exit_code == 0
+    assert "Deleted" in res2.stdout
 
 
 def test_version() -> None:
@@ -174,3 +196,102 @@ def test_validate_git_repo(
     )
     assert val.exit_code == 0
     assert "Analyzing changes" in caplog.text
+
+
+def test_validate_run_flags_invalid_json(tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
+    caplog.set_level(logging.INFO)
+    _git_init_with_commit(tmp_path)
+    subprocess.run(
+        ["git", "checkout", "-b", "feature"],
+        cwd=tmp_path,
+        check=True,
+        capture_output=True,
+    )
+    (tmp_path / "config_template.json").write_text("{bad json", encoding="utf-8")
+    subprocess.run(["git", "add", "."], cwd=tmp_path, check=True, capture_output=True)
+    subprocess.run(
+        ["git", "commit", "-m", "bad json"],
+        cwd=tmp_path,
+        check=True,
+        capture_output=True,
+    )
+    result = runner.invoke(
+        app,
+        [
+            "validate",
+            "--base",
+            "main",
+            "--feature",
+            "feature",
+            "--path",
+            str(tmp_path),
+            "--run",
+        ],
+    )
+    assert result.exit_code == 0
+    # Deterministic validator should surface this even without an API key.
+    assert "Regression detected" in result.stdout
+    assert "invalid json" in result.stdout.lower()
+
+
+def test_validate_uses_cache_on_repeat(tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
+    caplog.set_level(logging.INFO)
+    _git_init_with_commit(tmp_path)
+    subprocess.run(
+        ["git", "checkout", "-b", "feature"],
+        cwd=tmp_path,
+        check=True,
+        capture_output=True,
+    )
+    (tmp_path / "x.txt").write_text("hello\n", encoding="utf-8")
+    subprocess.run(["git", "add", "."], cwd=tmp_path, check=True, capture_output=True)
+    subprocess.run(
+        ["git", "commit", "-m", "change"],
+        cwd=tmp_path,
+        check=True,
+        capture_output=True,
+    )
+
+    caplog.clear()
+    r1 = runner.invoke(app, ["validate", "--base", "main", "--feature", "feature", "--path", str(tmp_path)])
+    assert r1.exit_code == 0
+    assert "Cache miss: change_summary" in caplog.text
+
+    caplog.clear()
+    r2 = runner.invoke(app, ["validate", "--base", "main", "--feature", "feature", "--path", str(tmp_path)])
+    assert r2.exit_code == 0
+    assert "Cache hit: change_summary" in caplog.text
+
+
+def test_validate_nocache_bypasses_cache(tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
+    caplog.set_level(logging.INFO)
+    _git_init_with_commit(tmp_path)
+    subprocess.run(
+        ["git", "checkout", "-b", "feature"],
+        cwd=tmp_path,
+        check=True,
+        capture_output=True,
+    )
+    (tmp_path / "x.txt").write_text("hello\n", encoding="utf-8")
+    subprocess.run(["git", "add", "."], cwd=tmp_path, check=True, capture_output=True)
+    subprocess.run(
+        ["git", "commit", "-m", "change"],
+        cwd=tmp_path,
+        check=True,
+        capture_output=True,
+    )
+
+    # Prime the cache.
+    caplog.clear()
+    r1 = runner.invoke(app, ["validate", "--base", "main", "--feature", "feature", "--path", str(tmp_path)])
+    assert r1.exit_code == 0
+    assert "Cache miss: change_summary" in caplog.text
+
+    # Now bypass it.
+    caplog.clear()
+    r2 = runner.invoke(
+        app,
+        ["validate", "--base", "main", "--feature", "feature", "--path", str(tmp_path), "--nocache"],
+    )
+    assert r2.exit_code == 0
+    assert "Cache miss: change_summary" in caplog.text

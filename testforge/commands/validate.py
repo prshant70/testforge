@@ -38,6 +38,11 @@ def validate(
         "--run",
         help="Actively execute lightweight validations (v1 simulated mode).",
     ),
+    nocache: bool = typer.Option(
+        False,
+        "--nocache",
+        help="Bypass the local cache and run the full pipeline.",
+    ),
     path: Optional[Path] = typer.Option(
         None,
         "--path",
@@ -54,6 +59,7 @@ def validate(
         feature=feature,
         path=str(path) if path else None,
         run=run,
+        nocache=nocache,
     )
     result = ValidationService(app_ctx).run(request)
 

@@ -12,3 +12,4 @@ class ValidateRequest:
     feature: str
     path: Optional[str] = None
     run: bool = False
+    nocache: bool = False

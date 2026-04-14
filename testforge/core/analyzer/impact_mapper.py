@@ -7,6 +7,7 @@ from typing import Dict, List
 
 from testforge.core.analyzer.change_analyzer import ChangeSummary
 from testforge.core.tools.code_tools import CodeTools
+from testforge.core.llm.guard import llm_disabled
 
 
 @dataclass
@@ -27,7 +28,7 @@ def map_impact(
     - If present: ask LLM to inspect diff + selectively read/search files using tools.
     """
     cfg = code_tools.config
-    if not str(cfg.get("llm_api_key") or "").strip():
+    if llm_disabled() or not str(cfg.get("llm_api_key") or "").strip():
         return ImpactSummary(endpoints=[], mapping={})
 
     import json
@@ -104,6 +105,7 @@ def map_impact(
         system=system,
         user=user,
         tools=tools,
+        purpose="map changes to impacted endpoints",
         max_tool_rounds=5,
         temperature=0.2,
     )

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, Optional
 
@@ -39,6 +40,8 @@ def run_with_tools(
     system: str,
     user: str,
     tools: List[ToolSpec],
+    purpose: Optional[str] = None,
+    log_tool_calls: bool = True,
     max_tool_rounds: int = 4,
     model: Optional[str] = None,
     temperature: float = 0.2,
@@ -46,8 +49,11 @@ def run_with_tools(
     """
     Run a bounded tool-calling loop and return the assistant's final text output.
     """
+    log = logging.getLogger("testforge")
     client = _client(config)
     model_name = model or str(config.get("default_model") or "gpt-4o-mini").strip()
+    if purpose:
+        log.info("LLM call: %s (model=%s, temp=%.2f)", purpose, model_name, float(temperature))
 
     openai_tools = [
         {
@@ -103,6 +109,12 @@ def run_with_tools(
                 args = json.loads(raw_args)
             except json.JSONDecodeError:
                 args = {}
+            if log_tool_calls:
+                # Keep logs brief: truncate large args.
+                arg_preview = raw_args
+                if len(arg_preview) > 300:
+                    arg_preview = arg_preview[:300] + "…"
+                log.info("Tool call: %s %s", name, arg_preview)
             handler = handlers.get(name)
             if handler is None:
                 out = f"ERROR: unknown tool {name!r}"

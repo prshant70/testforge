@@ -14,6 +14,7 @@ class CodeTools:
     base: str
     feature: str
     diff_text: str
+    changed_files: List[str]
     config: dict
 
     def search_code(self, query: str) -> List[str]:
