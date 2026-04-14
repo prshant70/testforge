@@ -1,0 +1,59 @@
+testforge/core/validator.py
+  88b9341a6f3549c6 61-77
+testforge/core/executor/validator.py
+  88b9341a6f3549c6 5-6,20-141,176-180
+testforge/core/llm/_openai_tools.py
+  88b9341a6f3549c6 6,43-44,52,55-56,112-117
+testforge/core/models/requests.py
+  88b9341a6f3549c6 15
+testforge/core/llm/execution_planner.py
+  88b9341a6f3549c6 11,26,96
+testforge/core/cache/__init__.py
+  88b9341a6f3549c6 1-2
+tests/conftest.py
+  88b9341a6f3549c6 1-15
+testforge/core/services/validation_service.py
+  88b9341a6f3549c6 10,12,14,20,51-53,55-59,61-108,115,119-138,140-157,167-178,182-189
+testforge/core/analyzer/impact_mapper.py
+  88b9341a6f3549c6 10,31,108
+testforge/core/cache/store.py
+  88b9341a6f3549c6 1-185
+testforge/commands/validate.py
+  88b9341a6f3549c6 41-45,62
+install.sh
+  88b9341a6f3549c6 1-153
+tests/test_cli.py
+  88b9341a6f3549c6 73,81-99,199-297
+testforge/core/llm/validation_planner.py
+  88b9341a6f3549c6 11,31,33-36,38,40,42,44,46-49,67,74-81,85,91-93,101,112-124
+testforge/core/llm/guard.py
+  88b9341a6f3549c6 1-20
+testforge/commands/cache.py
+  88b9341a6f3549c6 1-75
+testforge/cli.py
+  88b9341a6f3549c6 13,38
+testforge/core/tools/code_tools.py
+  88b9341a6f3549c6 17
+testforge/core/llm/result_analyzer.py
+  88b9341a6f3549c6 6,12,34-72,79-90,97-98,115,119-137,143-154
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.8",
+  "base_commit_sha": "5ef7a9e0fafd2d44649a410cb5c7c0f05240cad6",
+  "prompts": {
+    "88b9341a6f3549c6": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "5c7fcd00-3809-4f9b-b7c5-2f1d3e47e7a7",
+        "model": "default"
+      },
+      "human_author": "Prashant Mishra",
+      "messages": [],
+      "total_additions": 1079,
+      "total_deletions": 124,
+      "accepted_lines": 995,
+      "overriden_lines": 0
+    }
+  }
+}
