@@ -1,0 +1,39 @@
+testforge/core/executor/validator.py
+  88b9341a6f3549c6 7-8,144,146-242,282-296
+testforge/core/services/validation_service.py
+  88b9341a6f3549c6 147,156,175
+testforge/core/models/requests.py
+  88b9341a6f3549c6 15
+testforge/core/llm/execution_planner.py
+  88b9341a6f3549c6 31,86-87
+testforge/core/analyzer/change_analyzer.py
+  88b9341a6f3549c6 18-28,52-55
+testforge/core/llm/validation_planner.py
+  88b9341a6f3549c6 1,13-40,43-57,59-65,67-103,114,117,121,125,128,132-136
+testforge/commands/validate.py
+  88b9341a6f3549c6 41-45,61-62,69,76-78
+tests/test_cli.py
+  88b9341a6f3549c6 298-337
+testforge/core/llm/result_analyzer.py
+  88b9341a6f3549c6 82-86,90-91,97-98,111-112
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.8",
+  "base_commit_sha": "4a6687d6cbb8edf062dcade7d0a74e645e42fc0f",
+  "prompts": {
+    "88b9341a6f3549c6": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "5c7fcd00-3809-4f9b-b7c5-2f1d3e47e7a7",
+        "model": "default"
+      },
+      "human_author": "Prashant Mishra",
+      "messages": [],
+      "total_additions": 326,
+      "total_deletions": 166,
+      "accepted_lines": 301,
+      "overriden_lines": 0
+    }
+  }
+}
