@@ -14,6 +14,7 @@ keywords = ["cli", "testing", "git", "llm"]
 dependencies = [
     "typer>=0.12.0",
     "PyYAML>=6.0",
+    "openai>=1.40.0",
 ]
 
 [project.optional-dependencies]

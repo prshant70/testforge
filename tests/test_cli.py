@@ -68,27 +68,13 @@ def test_root_help() -> None:
     result = runner.invoke(app, ["--help"])
     assert result.exit_code == 0
     assert "TestForge" in result.stdout
+    assert "validate" in result.stdout
+    assert "config" in result.stdout
 
 
-def test_generate_requires_path() -> None:
-    result = runner.invoke(app, ["generate"])
+def test_validate_requires_args() -> None:
+    result = runner.invoke(app, ["validate"])
     assert result.exit_code != 0
-
-
-def test_generate_runs(tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
-    caplog.set_level(logging.INFO)
-    svc = tmp_path / "svc"
-    svc.mkdir()
-    result = runner.invoke(app, ["generate", "--path", str(svc)])
-    assert result.exit_code == 0
-    assert "Generating tests" in caplog.text
-
-
-def test_perf_stub(caplog: pytest.LogCaptureFixture) -> None:
-    caplog.set_level(logging.INFO)
-    result = runner.invoke(app, ["perf"])
-    assert result.exit_code == 0
-    assert "not implemented" in caplog.text.lower()
 
 
 def test_version() -> None:
@@ -146,11 +132,11 @@ def test_config_check_missing_file(monkeypatch, tmp_path: Path) -> None:
     assert code == 3
 
 
-def test_diff_rejects_non_git_directory(tmp_path: Path) -> None:
+def test_validate_rejects_non_git_directory(tmp_path: Path) -> None:
     plain = tmp_path / "not_a_repo"
     plain.mkdir()
     code = _exit_code_main(
-        "diff",
+        "validate",
         "--base",
         "main",
         "--feature",
@@ -161,7 +147,7 @@ def test_diff_rejects_non_git_directory(tmp_path: Path) -> None:
     assert code == 2
 
 
-def test_diff_and_validate_git_repo(
+def test_validate_git_repo(
     tmp_path: Path,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
@@ -173,15 +159,18 @@ def test_diff_and_validate_git_repo(
         check=True,
         capture_output=True,
     )
-    diff_result = runner.invoke(
-        app,
-        ["diff", "--base", "main", "--feature", "feature", "--path", str(tmp_path)],
+    # Make a change on feature.
+    (tmp_path / "x.py").write_text("def foo():\n    return 1\n", encoding="utf-8")
+    subprocess.run(["git", "add", "."], cwd=tmp_path, check=True, capture_output=True)
+    subprocess.run(
+        ["git", "commit", "-m", "change"],
+        cwd=tmp_path,
+        check=True,
+        capture_output=True,
     )
-    assert diff_result.exit_code == 0
-    assert "Analyzing diff" in caplog.text
     val = runner.invoke(
         app,
         ["validate", "--base", "main", "--feature", "feature", "--path", str(tmp_path)],
     )
     assert val.exit_code == 0
-    assert "Validating regressions" in caplog.text
+    assert "Analyzing changes" in caplog.text

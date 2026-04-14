@@ -10,9 +10,6 @@ import typer
 import yaml
 
 from testforge import __version__ as PKG_VERSION
-from testforge.commands.diff import diff_app
-from testforge.commands.generate import generate_app
-from testforge.commands.perf import perf_app
 from testforge.commands.validate import validate_app
 from testforge.core.config import (
     DEFAULTS,
@@ -32,14 +29,11 @@ from testforge.utils.paths import get_config_dir, get_config_file
 
 app = typer.Typer(
     name="testforge",
-    help="🔧 TestForge — generate tests, inspect branch diffs, and validate regressions.",
+    help="🔧 TestForge — change-aware validation assistant for code diffs.",
     epilog="Run `testforge <command> --help` for usage. Quickstart: `testforge init`",
     add_completion=False,
 )
-app.add_typer(generate_app, name="generate")
-app.add_typer(diff_app, name="diff")
 app.add_typer(validate_app, name="validate")
-app.add_typer(perf_app, name="perf")
 
 config_app = typer.Typer(
     help="Inspect or manage configuration.",
