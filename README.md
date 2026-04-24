@@ -1,139 +1,169 @@
 # TestForge
 
-**Know what your PR broke — before CI does.**
+Turn a Git diff into a pre-merge validation report.
 
-TestForge analyzes your code changes, predicts regressions, and tells you exactly what to validate before merging.
+TestForge looks at what changed between two branches and tells you:
+
+- what behavior actually changed
+- what’s most likely to break
+- what to verify before merging
+- whether the change looks safe to merge
+
+It’s meant to feel like a quick senior-engineer review of your PR, not a test generator.
 
 ---
 
-## ⚡ Example
+## Example
 
 ```bash
 testforge validate --base main --feature my-branch
 ```
 
 ```
-🔍 Behavioral Impact:
-Change introduces conditional routing of requests based on configuration.
+🧭 Change Intent:
+Intentional (High Confidence)
 
-💥 Potential Regressions:
+🎯 Analysis Confidence:
+High
+- Clear structural change detected
+- Change is localized
+
+🔍 Behavioral Impact:
+Introduces conditional routing for merchants requiring dynamic tokens.
+
+💥 Change-Induced Risks:
 
 🔥 HIGH RISK:
-- Requests may return 401 Unauthorized instead of expected success
+- Change: DynamicTokenRequestManager
+  Impact: alters handling of merchants without cached tokens
 
 🧪 Suggested Validations:
 
-🔥 1. Merchant requiring dynamic token  
-   → Expect: correct response via DynamicTokenRequestManager
+🔥 1. Merchant requiring dynamic token
+   → Expect: routed via DynamicTokenRequestManager, 200 OK
 
 🚨 Merge Risk: HIGH
 ```
 
-👉 This is what your code change might break — instantly.
+That’s what you get from a single command on your local branch, no CI needed.
 
 ---
 
-## 🚀 Why TestForge?
+## Install
 
-When you make a change:
+Requires: **macOS or Linux**, **Python 3.10+**, and **Git**.
 
-* ❌ You don’t know what you broke
-* ❌ CI tells you too late
-* ❌ Tests don’t cover everything
-
-TestForge helps you:
-
-* 🔍 Identify impacted endpoints
-* ⚠️ Understand risk of change
-* 🧠 Get targeted validation suggestions
-* 🚨 Catch regressions early
-
-All before you merge.
-
----
-
-## ⚡ Quick Start
+One-liner:
 
 ```bash
-pip install testforge
-testforge init
-testforge validate --base main --feature my-branch
+curl -fsSL https://raw.githubusercontent.com/prashantmishra/testforge/main/install.sh | bash
+```
+
+The installer prefers `pipx` for an isolated install and falls back to `pip --user`. To install from source:
+
+```bash
+git clone https://github.com/prashantmishra/testforge.git
+cd testforge
+pip install -e ".[dev]"
 ```
 
 ---
 
-## 🧰 Commands
+## First use
+
+1. Set up your config (prompts for LLM provider, model, and API key):
 
 ```bash
-testforge validate --base <branch> --feature <branch> [--path /path/to/repo]
+testforge init
+```
+
+2. From inside a Git repo, run:
+
+```bash
+testforge validate --base main --feature my-branch
+```
+
+Or from anywhere:
+
+```bash
+testforge validate --base main --feature my-branch --path /path/to/repo
+```
+
+3. Check your config anytime:
+
+```bash
 testforge config show
 testforge config check
 ```
 
 ---
 
-## ⚙️ Configuration
+## Commands
 
-Default location: `~/.testforge/config.yaml`
+```bash
+# Core
+testforge validate --base <branch> --feature <branch> [--path /path/to/repo] [--nocache]
 
-| Field           | Description                   | Default       |
-| --------------- | ----------------------------- | ------------- |
-| `llm_provider`  | Provider name (e.g. `openai`) | `openai`      |
-| `llm_api_key`   | API key (set via `init`)      | empty         |
-| `default_model` | Default model id              | `gpt-4o-mini` |
-| `log_level`     | `DEBUG`, `INFO`, `ERROR`, …   | `INFO`        |
+# Setup / config
+testforge init
+testforge config show
+testforge config check
+
+# Local cache (per repo + commit pair, 7-day TTL)
+testforge cache list
+testforge cache purge --expired
+testforge cache purge --all
+```
+
+Notable flags:
+
+- `--path` — point at a repo outside your current directory
+- `--nocache` — ignore the local cache and re-run the full pipeline
 
 ---
 
-## 🧠 How It Works
+## Configuration
 
-TestForge uses a **change-aware validation pipeline**:
+Config lives at `~/.testforge/config.yaml` (created by `testforge init`).
+
+| Field           | Description                                  | Default         |
+| --------------- | -------------------------------------------- | --------------- |
+| `llm_provider`  | LLM provider (e.g. `openai`)                 | `openai`        |
+| `llm_api_key`   | API key used for LLM calls                   | *(empty)*       |
+| `default_model` | Model used for analysis                      | `gpt-4o-mini`   |
+| `log_level`     | `DEBUG`, `INFO`, `WARNING`, `ERROR`          | `INFO`          |
+
+Without an API key, TestForge falls back to a minimal, deterministic output.
+
+---
+
+## How it works
+
+TestForge runs a deterministic-first pipeline over your Git diff:
 
 ```
 Git Diff
-→ Change Analysis
-→ Impact Mapping (functions → endpoints)
-→ Risk Classification
-→ LLM-based Validation Planning
+  → Change Analyzer       (files, diff text; excludes lockfiles)
+  → Intent Classifier     (intentional vs unintended)
+  → Impact Mapper         (changed code → likely endpoints, LLM-assisted)
+  → Risk Classifier       (validation / error handling / persistence / external calls)
+  → Confidence Scorer     (how much to trust the analysis)
+  → Validation Planner    (LLM, evidence-based, structured output)
 ```
 
-It does **not** rely on:
-
-* full test coverage
-* running services
-* complex infrastructure
-
-Instead, it focuses on **what actually changed and what might break**.
+Results are cached per `(repo, base SHA, feature SHA)` for **7 days**, so re-running is fast.
 
 ---
 
-## 🎯 When to Use
-
-Use TestForge when:
-
-* Reviewing a PR
-* Before merging to main
-* Validating risky changes
-* Unsure what to test
-
----
-
-## 🧪 Development
+## Development
 
 ```bash
-pytest
+pip install -e ".[dev]"
+pytest -q
 ```
 
 ---
 
-## 🤝 Contributing
-
-Contributions, ideas, and feedback are welcome.
-
-If TestForge helped you catch a bug — please open an issue or share your experience 🙌
-
----
-
-## 📜 License
+## License
 
 MIT
