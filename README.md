@@ -56,13 +56,13 @@ Requires: **macOS or Linux**, **Python 3.10+**, and **Git**.
 One-liner:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/prashantmishra/testforge/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/prshant70/testforge/main/install.sh | bash
 ```
 
 The installer prefers `pipx` for an isolated install and falls back to `pip --user`. To install from source:
 
 ```bash
-git clone https://github.com/prashantmishra/testforge.git
+git clone https://github.com/prshant70/testforge.git
 cd testforge
 pip install -e ".[dev]"
 ```
