@@ -6,7 +6,7 @@ set -euo pipefail
 #   curl -fsSL https://raw.githubusercontent.com/<owner>/<repo>/<ref>/install.sh | bash
 #
 # Optional env overrides:
-#   TESTFORGE_REPO="owner/repo"          (default: prashantmishra/testforge)
+#   TESTFORGE_REPO="owner/repo"          (default: prshant70/testforge)
 #   TESTFORGE_REF="main"                (default: main)
 #   TESTFORGE_INSTALL_METHOD="pipx"     (pipx|pip) default: auto
 
@@ -35,7 +35,7 @@ _need_cmd bash
 _need_cmd curl
 _need_cmd git
 
-TESTFORGE_REPO="${TESTFORGE_REPO:-prashantmishra/testforge}"
+TESTFORGE_REPO="${TESTFORGE_REPO:-prshant70/testforge}"
 TESTFORGE_REF="${TESTFORGE_REF:-main}"
 TESTFORGE_INSTALL_METHOD="${TESTFORGE_INSTALL_METHOD:-auto}"
 

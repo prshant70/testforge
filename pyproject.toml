@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "testforge"
 version = "0.2.0"
-description = "CLI for generating tests, analyzing diffs, and validating regressions across branches."
+description = "Turn a Git diff into a pre-merge validation report."
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
@@ -24,6 +24,9 @@ dev = [
 
 [project.scripts]
 testforge = "testforge.cli:main"
+
+[project.urls]
+Repository = "https://github.com/prshant70/testforge"
 
 [tool.setuptools.packages.find]
 where = ["."]
